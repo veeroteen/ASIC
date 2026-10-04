@@ -47,38 +47,23 @@ STD_OUTPUT_HANDLE EQU -11
 
 main PROC
 
-    ; =========================================
     ; Получаем HANDLE стандартного ввода
-    ; =========================================
-
     push STD_INPUT_HANDLE
     call GetStdHandle@4
 
     mov hInput, eax
 
-
-    ; =========================================
     ; Получаем HANDLE стандартного вывода
-    ; =========================================
-
     push STD_OUTPUT_HANDLE
     call GetStdHandle@4
 
     mov hOutput, eax
 
-
-    ; =========================================
-    ; 1. Вывод приглашения
-    ; =========================================
-
+    ; 1. Вывод инструкции
     push offset msgInput
     call PrintString
 
-
-    ; =========================================
     ; Читаем строку
-    ; =========================================
-
     push 0
     push offset charsRead
     push 127
@@ -86,25 +71,15 @@ main PROC
     push hInput
     call ReadConsoleA@20
 
-
-    ; =========================================
     ; Получаем длину строки
-    ; =========================================
-
     push offset inputBuffer
     call lstrlenA@4
 
     ; EAX = длина строки
-
     mov ecx, eax
     mov esi, offset inputBuffer
 
-    ; =========================================
     ; Перевод из двоичной системы
-    ;
-    ; x = x * 2 + digit
-    ; =========================================
-
     xor eax, eax
 
 convert_loop:
@@ -161,11 +136,7 @@ convert_done:
 
     mov x, eax
 
-
-    ; =========================================
     ; 2. Вывод введенного числа в десятичном
-    ; =========================================
-
     push offset msgDecimal
     call PrintString
 
@@ -177,62 +148,38 @@ convert_done:
     push offset outputBuffer
     call PrintString
 
-
-    ; =========================================
-    ; 3. Вычисление полинома
-    ;
+    ; Вычисление полинома
     ; 5*x^2 + 18*x - 1
-    ;
-    ; Преобразуем:
-    ;
-    ; x * (5*x + 18) - 1
-    ; =========================================
 
+    ; 5x^2 в ecx
     mov eax, x
+    mul eax
+    mov ebx, 5
+    mul ebx
+    mov ecx, eax
 
-    ; EBX = x
-    mov ebx, eax
-
-    ; EAX = 4*x
-    shl eax, 1
-    shl eax, 1
-
-    ; EAX = 5*x
-    add eax, ebx
-
-    ; EAX = 5*x + 18
-    add eax, 18
-
-    ; EBX = 5*x + 18
-    mov ebx, eax
-
-    ; EAX = x
+    ; 18x
     mov eax, x
-
-    ; EDX:EAX = x * (5*x + 18)
+    mov ebx, 18
     mul ebx
 
-    ; EAX = 5*x^2 + 18*x - 1
-    dec eax
+    ; + 18x
+    add ecx, eax
 
-    mov result, eax
+    ; -1
+    sub ecx, 1
+
+    mov result, ecx
 
 
-    ; =========================================
-    ; 4. Вывод результата в восьмеричной
-    ; =========================================
-
+    ; Вывод результата в восьмеричной
     push offset msgOctal
     call PrintString
 
     push result
     call PrintOctal
 
-
-    ; =========================================
-    ; 5. Вывод результата в десятичной
-    ; =========================================
-
+    ; Вывод результата в десятичной
     push offset msgResult
     call PrintString
 
@@ -245,24 +192,10 @@ convert_done:
     call PrintString
 
 
-    ; =========================================
-    ; Завершение программы
-    ; =========================================
-
     push 0
     call ExitProcess@4
 
 main ENDP
-
-
-; =========================================================
-; PrintString
-;
-; Вход:
-;     [ESP + 4] = адрес строки
-;
-; Использует WriteConsoleA
-; =========================================================
 
 PrintString PROC
 
@@ -277,7 +210,6 @@ PrintString PROC
     call lstrlenA@4
 
     ; EAX = длина
-
     push 0
     push offset charsRead
     push eax
@@ -290,15 +222,6 @@ PrintString PROC
 
 PrintString ENDP
 
-; =========================================================
-; PrintOctal
-;
-; Вход:
-;     [ESP + 4] = число
-;
-; Вывод числа в восьмеричной системе
-; =========================================================
-
 PrintOctal PROC
 
     push ebp
@@ -306,9 +229,7 @@ PrintOctal PROC
 
     mov eax, [ebp + 8]
 
-    ; -----------------------------------------
     ; Если число = 0
-    ; -----------------------------------------
 
     cmp eax, 0
     jne octal_convert
@@ -326,10 +247,8 @@ octal_convert:
 
     xor ecx, ecx
 
-    ; -----------------------------------------
-    ; Делим число на 8
-    ; -----------------------------------------
 
+; Делим число на 8
 octal_divide:
 
     xor edx, edx
@@ -348,10 +267,7 @@ octal_divide:
     cmp eax, 0
     jne octal_divide
 
-
-    ; -----------------------------------------
     ; Извлекаем цифры в обратном порядке
-    ; -----------------------------------------
 
     mov edi, offset outputBuffer
 
@@ -369,10 +285,7 @@ octal_write:
     mov byte ptr [edi], 0
 
 
-    ; -----------------------------------------
     ; Выводим полученную строку
-    ; -----------------------------------------
-
     push offset outputBuffer
     call PrintString
 
@@ -384,10 +297,7 @@ octal_done:
 
 PrintOctal ENDP
 
-; =========================================================
 ; Ошибка ввода
-; =========================================================
-
 input_error:
 
     push offset msgError
