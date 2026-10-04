@@ -26,7 +26,7 @@ STD_OUTPUT_HANDLE EQU -11
     ; Переменные
     x       dd ?
     result  dd ?
-
+    sign dd 0
     ; Буфер для вывода
     outputBuffer db 128 dup(0)
 
@@ -82,6 +82,20 @@ main PROC
     ; Перевод из двоичной системы
     xor eax, eax
 
+    
+
+    ; Проверяем первый символ
+    mov bl, [esi]
+
+    cmp bl, '-'
+    jne convert_loop
+
+    ; Если первый символ '-', запоминаем отрицательное число
+    mov sign, 1
+
+    inc esi
+    dec ecx
+
 convert_loop:
 
     cmp ecx, 0
@@ -134,6 +148,12 @@ next_digit:
 
 convert_done:
 
+    ; Если число отрицательное — меняем знак
+    cmp sign, 1
+    jne number_positive
+
+    neg eax
+number_positive:
     mov x, eax
 
     ; 2. Вывод введенного числа в десятичном
@@ -153,15 +173,15 @@ convert_done:
 
     ; 5x^2 в ecx
     mov eax, x
-    mul eax
-    mov ebx, 5
-    mul ebx
+    imul eax
+    mov edx, 5
+    imul edx
     mov ecx, eax
 
     ; 18x
     mov eax, x
-    mov ebx, 18
-    mul ebx
+    mov edx, 18
+    imul edx
 
     ; + 18x
     add ecx, eax
@@ -223,14 +243,29 @@ PrintString PROC
 PrintString ENDP
 
 PrintOctal PROC
-
     push ebp
     mov ebp, esp
 
     mov eax, [ebp + 8]
 
-    ; Если число = 0
+    ; Проверяем знак
+    cmp eax, 0
+    jge positive
 
+    ; Число отрицательное
+    push eax
+
+    mov byte ptr [outputBuffer], '-'
+    mov byte ptr [outputBuffer + 1], 0
+
+    push offset outputBuffer
+    call PrintString
+
+    pop eax
+    neg eax
+
+positive:
+    ; Проверяем случай, когда число равно 0
     cmp eax, 0
     jne octal_convert
 
@@ -239,65 +274,45 @@ PrintOctal PROC
 
     push offset outputBuffer
     call PrintString
-
     jmp octal_done
-
 
 octal_convert:
 
-    xor ecx, ecx
+    mov ecx, 0
 
-
-; Делим число на 8
 octal_divide:
-
     xor edx, edx
-
     mov ebx, 8
     div ebx
 
-    ; Остаток = очередная восьмеричная цифра
     add dl, '0'
-
-    ; Сохраняем цифру
     push dx
-
     inc ecx
 
     cmp eax, 0
     jne octal_divide
 
-    ; Извлекаем цифры в обратном порядке
-
     mov edi, offset outputBuffer
 
 octal_write:
-
     pop dx
-
     mov [edi], dl
-
     inc edi
-
     loop octal_write
 
-    ; Нулевая строка в конце
     mov byte ptr [edi], 0
 
-
-    ; Выводим полученную строку
     push offset outputBuffer
     call PrintString
 
-
 octal_done:
-
     pop ebp
     ret 4
 
 PrintOctal ENDP
 
 ; Ошибка ввода
+
 input_error:
 
     push offset msgError
