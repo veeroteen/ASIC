@@ -7,7 +7,6 @@ EXTERN WriteConsoleA@20: PROC
 EXTERN ReadConsoleA@20: PROC
 EXTERN ExitProcess@4: PROC
 EXTERN lstrlenA@4: PROC
-EXTERN wsprintfA: PROC
 
 STD_INPUT_HANDLE  EQU -10
 STD_OUTPUT_HANDLE EQU -11
@@ -26,6 +25,9 @@ STD_OUTPUT_HANDLE EQU -11
     ; Переменные
     x       dd ?
     result  dd ?
+    deciaml dd 0
+    binary dd 0
+    octal dd 0
     sign dd 0
     ; Буфер для вывода
     outputBuffer db 128 dup(0)
@@ -33,14 +35,14 @@ STD_OUTPUT_HANDLE EQU -11
     ; Строки
     msgInput db "Enter binary number: ", 0
 
+    msgBinnary db 13, 10, "Binary input:", 0
     msgDecimal db 13, 10, "Decimal input: ", 0
     msgOctal   db 13, 10, "Result in octal: ", 0
     msgResult  db 13, 10, "Result in decimal: ", 0
 
     msgError db 13, 10, "Invalid binary number!", 13, 10, 0
 
-    ; Форматы для wsprintfA
-    formatDecimal db "%d", 0
+
 
 
 .code
@@ -79,9 +81,8 @@ main PROC
     mov ecx, eax
     mov esi, offset inputBuffer
 
-    ; Перевод из двоичной системы
     xor eax, eax
-
+    xor edx, edx
     
 
     ; Проверяем первый символ
@@ -126,16 +127,20 @@ convert_loop:
 digit_zero:
 
     ; x = x * 2
-    shl eax, 1
-
+    shl edx, 1
+    imul eax, eax, 10
     jmp next_digit
 
 
 digit_one:
 
     ; x = x * 2 + 1
-    shl eax, 1
+    shl edx, 1
+    inc edx
+
+    imul eax, eax, 10
     inc eax
+    
 
 
 next_digit:
@@ -150,36 +155,42 @@ convert_done:
 
     ; Если число отрицательное — меняем знак
     cmp sign, 1
-    jne number_positive
+    jne number_ready
 
+    
     neg eax
-number_positive:
-    mov x, eax
+    neg edx
+    
+number_ready:
+    mov binary, eax
+    mov deciaml, edx
+
+    ; 1. Вывод введеного числа в двоичном
+    push offset msgBinnary
+    call PrintString
+
+    push binary
+    call PrintDecimal
 
     ; 2. Вывод введенного числа в десятичном
     push offset msgDecimal
     call PrintString
 
-    push x
-    push offset formatDecimal
-    push offset outputBuffer
-    call wsprintfA
-
-    push offset outputBuffer
-    call PrintString
+    push deciaml
+    call PrintDecimal
 
     ; Вычисление полинома
     ; 5*x^2 + 18*x - 1
 
     ; 5x^2 в ecx
-    mov eax, x
+    mov eax, deciaml
     imul eax
     mov edx, 5
     imul edx
     mov ecx, eax
 
     ; 18x
-    mov eax, x
+    mov eax, deciaml
     mov edx, 18
     imul edx
 
@@ -204,12 +215,7 @@ number_positive:
     call PrintString
 
     push result
-    push offset formatDecimal
-    push offset outputBuffer
-    call wsprintfA
-
-    push offset outputBuffer
-    call PrintString
+    call PrintDecimal
 
 
     push 0
@@ -241,6 +247,82 @@ PrintString PROC
     ret 4
 
 PrintString ENDP
+PrintDecimal PROC
+    push ebp
+    mov ebp, esp
+
+    mov eax, [ebp + 8]
+
+    ; Проверяем знак
+    cmp eax, 0
+    jge decimal_positive
+
+    ; Выводим '-'
+    mov byte ptr [outputBuffer], '-'
+    mov byte ptr [outputBuffer + 1], 0
+
+    push eax
+    push offset outputBuffer
+    call PrintString
+    pop eax
+
+    neg eax
+
+decimal_positive:
+
+    ; Отдельно обрабатываем 0
+    cmp eax, 0
+    jne decimal_convert
+
+    mov byte ptr [outputBuffer], '0'
+    mov byte ptr [outputBuffer + 1], 0
+
+    push offset outputBuffer
+    call PrintString
+    jmp decimal_done
+
+
+decimal_convert:
+
+    xor ecx, ecx
+
+decimal_divide:
+
+    xor edx, edx
+    mov ebx, 10
+    div ebx
+
+    add dl, '0'
+
+    push dx
+    inc ecx
+
+    cmp eax, 0
+    jne decimal_divide
+
+
+    mov edi, offset outputBuffer
+
+decimal_write:
+
+    pop dx
+    mov [edi], dl
+    inc edi
+
+    loop decimal_write
+
+    mov byte ptr [edi], 0
+
+    push offset outputBuffer
+    call PrintString
+
+
+decimal_done:
+
+    pop ebp
+    ret 4
+
+PrintDecimal ENDP
 
 PrintOctal PROC
     push ebp
