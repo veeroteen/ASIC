@@ -23,9 +23,8 @@ STD_OUTPUT_HANDLE EQU -11
     charsRead dd ?
 
     ; Переменные
-    x       dd ?
     result  dd ?
-    deciaml dd 0
+    decimal dd 0
     binary dd 0
     octal dd 0
     sign dd 0
@@ -163,7 +162,7 @@ convert_done:
     
 number_ready:
     mov binary, eax
-    mov deciaml, edx
+    mov decimal, edx
 
     ; 1. Вывод введеного числа в двоичном
     push offset msgBinnary
@@ -176,21 +175,21 @@ number_ready:
     push offset msgDecimal
     call PrintString
 
-    push deciaml
+    push decimal
     call PrintDecimal
 
     ; Вычисление полинома
     ; 5*x^2 + 18*x - 1
 
     ; 5x^2 в ecx
-    mov eax, deciaml
+    mov eax, decimal
     imul eax
     mov edx, 5
     imul edx
     mov ecx, eax
 
     ; 18x
-    mov eax, deciaml
+    mov eax, decimal
     mov edx, 18
     imul edx
 
@@ -202,13 +201,14 @@ number_ready:
 
     mov result, ecx
 
-
     ; Вывод результата в восьмеричной
     push offset msgOctal
     call PrintString
 
     push result
-    call PrintOctal
+    call ConvertToOctal
+    push octal
+    call PrintDecimal
 
     ; Вывод результата в десятичной
     push offset msgResult
@@ -321,77 +321,84 @@ decimal_done:
 
     pop ebp
     ret 4
-
 PrintDecimal ENDP
 
-PrintOctal PROC
+ConvertToOctal PROC
     push ebp
     mov ebp, esp
 
     mov eax, [ebp + 8]
 
-    ; Проверяем знак
+    mov octal, 0
+
+    ; sign = 0 -> положительное
+    ; sign = 1 -> отрицательное
+    mov sign, 0
+
     cmp eax, 0
     jge positive
 
-    ; Число отрицательное
-    push eax
-
-    mov byte ptr [outputBuffer], '-'
-    mov byte ptr [outputBuffer + 1], 0
-
-    push offset outputBuffer
-    call PrintString
-
-    pop eax
+    mov sign, 1
     neg eax
 
 positive:
-    ; Проверяем случай, когда число равно 0
+
+    ; Отдельный случай: 0
     cmp eax, 0
     jne octal_convert
 
-    mov byte ptr [outputBuffer], '0'
-    mov byte ptr [outputBuffer + 1], 0
-
-    push offset outputBuffer
-    call PrintString
+    mov octal, 0
     jmp octal_done
+
 
 octal_convert:
 
-    mov ecx, 0
+    xor ecx, ecx
 
 octal_divide:
+
     xor edx, edx
     mov ebx, 8
     div ebx
 
-    add dl, '0'
-    push dx
+    ; Сохраняем очередную цифру
+    push edx
     inc ecx
 
     cmp eax, 0
     jne octal_divide
 
-    mov edi, offset outputBuffer
+
+    ; Собираем цифры в обратном порядке
+    xor ebx, ebx
 
 octal_write:
-    pop dx
-    mov [edi], dl
-    inc edi
+
+    pop edx
+
+    ; EBX = EBX * 10 + цифра
+    imul ebx, ebx, 10
+    add ebx, edx
+
     loop octal_write
 
-    mov byte ptr [edi], 0
+    mov octal, ebx
 
-    push offset outputBuffer
-    call PrintString
 
 octal_done:
+
+    ; Если исходное число было отрицательным
+    cmp sign, 1
+    jne convert_done
+
+    neg octal
+
+convert_done:
+
     pop ebp
     ret 4
 
-PrintOctal ENDP
+ConvertToOctal ENDP
 
 ; Ошибка ввода
 
