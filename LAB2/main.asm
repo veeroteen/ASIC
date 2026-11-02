@@ -68,7 +68,6 @@ compress_loop:
     jz add_unique
 
     repne scasb
-
     je next_char
 
 add_unique:
